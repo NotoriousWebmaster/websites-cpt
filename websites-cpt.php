@@ -19,6 +19,8 @@ class CDL_websites_cpt {
 		add_action('do_meta_boxes', [$this, 'kill_metaboxes']);	
 
 		add_filter('post_row_actions', [$this, 'filterRowActions'], 10, 2);
+
+		add_shortcode('websites_form', [$this, 'renderForm']);
 	}
 
 	public function init() {
@@ -70,10 +72,21 @@ class CDL_websites_cpt {
 	public function filterRowActions($actions, $post) {
 		global $oLog;
 
-		$oLog->logrow('actions', $actions);
-		$actions['view'] = "<a href=\"http://localhost/wp-admin/post.php?post={$post->ID}&amp;action=edit\" aria-label=\"Edit \“{$post->post_title}\”\">View</a>";
+		$oLog->logrow('actions start', $actions);
+
+		// $actions['view'] = "<a href=\"http://localhost/wp-admin/post.php?post={$post->ID}&amp;action=edit\" aria-label=\"Edit \“{$post->post_title}\”\">View</a>";
+		unset($actions['inline hide-if-no-js']);
+		$oLog->logrow('actions end', $actions);
 		$oLog->logrow('post', $post);
 		return $actions;
+	}
+
+	public function renderForm() {
+
+		wp_enqueue_script( 'websites-cpt-process-form', plugins_url('js/process-form.js', __FILE__), null, null, true );
+
+
+		return file_get_contents( plugin_dir_path( __FILE__ ) . "partials/websites-form.php" );
 	}
 
 }
