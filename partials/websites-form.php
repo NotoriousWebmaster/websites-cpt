@@ -1,4 +1,9 @@
-<form name="websites-cpt" class="websites-cpt-form">
+<div id="message-container"></div>
+
+<form name="websites-cpt" id="websites-cpt-form">
+	<?php
+		wp_nonce_field('adding-websites-cpt-post', 'websites-cpt-form-nonce');
+	?>
 	<label for="websites-cpt-form__name">Name:</label>
 	<input type="text" class="websites-cpt-form__name" name="websites-cpt-form__name" value="" />
 

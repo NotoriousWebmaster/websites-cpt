@@ -9,10 +9,9 @@ Author URI: http://notoriouswebmaster.com
 License: TBD
 */
 
-defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
-
 class CDL_websites_cpt {
 	public function __construct() {
+		global $oLog;
 
 		add_action('init', [$this, 'init']);	
 
@@ -21,9 +20,20 @@ class CDL_websites_cpt {
 		add_filter('post_row_actions', [$this, 'filterRowActions'], 10, 2);
 
 		add_shortcode('websites_form', [$this, 'renderForm']);
+
+		// handle AJAX calls for both logged in and guest users
+		add_action('wp_ajax_websites_cpt_create_post', [$this, 'create_post']);
+		add_action('wp_ajax_nopriv_websites_cpt_create_post', [$this, 'create_post']);
+
 	}
 
 	public function init() {
+		global $oLog;
+
+		// echo('In init ------------------------\n');
+		// echo "_POST: " . var_export($_POST, true);
+
+		// register WEBSITES CPT
 		register_post_type('WEBSITES', [
 			'menu_icon' 						=> 'dashicons-media-spreadsheet',
 			'menu_position' 				=> 5, 	// below Posts
@@ -32,32 +42,29 @@ class CDL_websites_cpt {
 			'show_in_nav_menus' 		=> true,
 			'show_in_admin_bar' 		=> false,
 			'hierarchical' 					=> false,
-			// 'supports' 							=> [],
 			'show_ui' 							=> true,
 			'show_in_menu' 					=> true,
 			'labels'								=> [
 				'name' 									=> 'Websites',
 				'singular_name' 				=> 'Website',
 				'add_new_item' 					=> 'Add New Website',
+				'edit_item'							=> 'View Website Source',
 				'view_item' 						=> 'View Website Source',
 				'view_items'						=> 'View Website Sources',
 				'all_items' 						=> 'All Websites',
 				'search_items'					=> 'Search Websites',
 			],
-			/*
-			'capabilities'					=> [ 
-				'create_posts' 					=> false,
-				'edit_post'							=> true,
-				'read_post'							=> true,
-				'delete_post'						=> true,
-				'edit_posts'						=> true,
-				'edit_others_posts'			=> true,
+			// 'capability_type'				=> 'custom_post_type',
+			'capabilities'					=> [
+				'create_posts'					=> 'do_not_allow',
 			],
-			*/
+			'map_meta_cap'					=> true,
 			'register_meta_box_cb'	=> [$this, 'showMetaBox'],
 		]);
 
-		
+		remove_post_type_support('websites', 'title');
+		remove_post_type_support('websites', 'editor');
+
 	}
 
 	public function kill_metaboxes() {
@@ -66,30 +73,87 @@ class CDL_websites_cpt {
 	}
 
 	public function showMetaBox() {
-		echo 'Here I am in the showMetaBox -----------------';
+		
+
 	}
 
 	public function filterRowActions($actions, $post) {
-		global $oLog;
-
-		$oLog->logrow('actions start', $actions);
 
 		// $actions['view'] = "<a href=\"http://localhost/wp-admin/post.php?post={$post->ID}&amp;action=edit\" aria-label=\"Edit \“{$post->post_title}\”\">View</a>";
 		unset($actions['inline hide-if-no-js']);
-		$oLog->logrow('actions end', $actions);
-		$oLog->logrow('post', $post);
 		return $actions;
 	}
 
 	public function renderForm() {
 
-		wp_enqueue_script( 'websites-cpt-process-form', plugins_url('js/process-form.js', __FILE__), null, null, true );
+		wp_register_script('websites-cpt-process-form', plugins_url('js/process-form.js', __FILE__), null, null, true );
 
+		// vars being sent to JS
+		$php_vars = [
+			// passing the url to call for passing the form data back to WP
+			'ajaxurl' => admin_url( 'admin-ajax.php', isset( $_SERVER["HTTPS"] ) ? 'https://' : 'http://' )
+		];
+		wp_localize_script( 'websites-cpt-process-form', 'phpvars', $php_vars );
 
-		return file_get_contents( plugin_dir_path( __FILE__ ) . "partials/websites-form.php" );
+		wp_enqueue_script( 'websites-cpt-process-form' );
+
+		// render form
+		include_once( plugin_dir_path( __FILE__ ) . "partials/websites-form.php" );
+	}
+
+	public function create_post() {
+		global $oLog;
+
+		$oLog->lograw('==================================================');
+		$oLog->logrow('_POST', $_POST);
+
+		$res = [];
+		$error = [];
+
+		// sanitize data
+		$name = sanitize_text_field($_POST['name']);
+		$url = esc_url($_POST['url'], ['http', 'https']);
+		$oLog->logdbg('Name: ' . $name . ' - url: ' . $url);
+
+		if (empty($name)) {
+			$error[] = 'Invalid Name field.';
+		}
+		if (empty($url)) {
+			$error[] = 'Invalid URL field.';
+		}
+
+		// verify nonce
+
+		// create post with name in title
+		$oLog->logrow('error', $error);
+		if (count($error) === 0) {
+			$post_data = [
+				'post_type' => 'WEBSITES',
+				'post_title' => $name,
+				'post_excerpt' => $url,
+				'post_status' => 'publish',
+			];
+			$new_id = wp_insert_post($post_data);
+			if ($new_id === 0) {
+				$error[] = 'Problem writing post to database.';
+			}
+			$oLog->logrow('post_data', $post_data);
+			$oLog->logdbg('new_id: ' . $new_id);
+		} else {
+			$new_id = 0;
+		}
+
+		$res['status'] = $new_id !== 0 && count($error) === 0 ? 'success' : 'error';
+		$res['err'] = $error;
+
+		// echo response
+		echo json_encode($res);
+
+		// die
+		die();
 	}
 
 }
 
-$websites_CPT = new CDL_websites_cpt();
+new CDL_websites_cpt();
 
