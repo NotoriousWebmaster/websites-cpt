@@ -11,7 +11,6 @@ License: TBD
 
 class CDL_websites_cpt {
 	public function __construct() {
-		global $oLog;
 
 		add_action('init', [$this, 'init']);	
 
@@ -28,7 +27,6 @@ class CDL_websites_cpt {
 	}
 
 	public function init() {
-		global $oLog;
 
 		// echo('In init ------------------------\n');
 		// echo "_POST: " . var_export($_POST, true);
@@ -54,7 +52,6 @@ class CDL_websites_cpt {
 				'all_items' 						=> 'All Websites',
 				'search_items'					=> 'Search Websites',
 			],
-			// 'capability_type'				=> 'custom_post_type',
 			'capabilities'					=> [
 				'create_posts'					=> 'do_not_allow',
 			],
@@ -74,7 +71,24 @@ class CDL_websites_cpt {
 
 	public function showMetaBox() {
 		
+		add_meta_box('websites-cpt-source', 'Website Source', [$this, 'sourceMetabox']);
+	}
 
+	public function sourceMetabox( $post ) {
+
+		echo "<div class='website-source-name'>Name: <span>{$post->post_title}</span></div>";
+		echo "<div class='website-source-url'>URL: <span>{$post->post_excerpt}</span></div>";
+
+		// fetch the body of the URL
+		$theBody = wp_remote_retrieve_body( wp_remote_get($post->post_excerpt) );
+		if (is_wp_error($theBody) || empty($theBody)) {
+			$theBody = 'ERROR: Could not retrieve source';
+		} else {
+			// escape < and >
+			$theBody = str_replace(['<', '>'], ['&lt;', '&gt;'], $theBody);
+		}
+
+		echo "<div class='website-source-code'><pre><code>{$theBody}</code></pre></div>";
 	}
 
 	public function filterRowActions($actions, $post) {
@@ -102,10 +116,6 @@ class CDL_websites_cpt {
 	}
 
 	public function create_post() {
-		global $oLog;
-
-		$oLog->lograw('==================================================');
-		$oLog->logrow('_POST', $_POST);
 
 		$res = [];
 		$error = [];
@@ -113,7 +123,6 @@ class CDL_websites_cpt {
 		// sanitize data
 		$name = sanitize_text_field($_POST['name']);
 		$url = esc_url($_POST['url'], ['http', 'https']);
-		$oLog->logdbg('Name: ' . $name . ' - url: ' . $url);
 
 		if (empty($name)) {
 			$error[] = 'Invalid Name field.';
@@ -125,7 +134,6 @@ class CDL_websites_cpt {
 		// verify nonce
 
 		// create post with name in title
-		$oLog->logrow('error', $error);
 		if (count($error) === 0) {
 			$post_data = [
 				'post_type' => 'WEBSITES',
@@ -137,8 +145,6 @@ class CDL_websites_cpt {
 			if ($new_id === 0) {
 				$error[] = 'Problem writing post to database.';
 			}
-			$oLog->logrow('post_data', $post_data);
-			$oLog->logdbg('new_id: ' . $new_id);
 		} else {
 			$new_id = 0;
 		}
