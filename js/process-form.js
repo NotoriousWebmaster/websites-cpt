@@ -23,7 +23,6 @@ jQuery(document).ready( function($) {
 			type: 'post',
 			data: data,
 			success: function(res) {
-				console.log('success', res);
 				res = JSON.parse(res);
 				// response messages and clearing the form
 				if (res.status === 'success') {
@@ -37,7 +36,6 @@ jQuery(document).ready( function($) {
 				}
 			},
 			error: function(jqXHR, status, error) {
-				console.log('error', status, error);
 				messageContainer.innerHTML = '<div class="error">ERROR: ' + status + ' - ' + error + '</div>';
 			}
 		});
